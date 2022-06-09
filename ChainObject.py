@@ -1,3 +1,4 @@
+import main
 import time
 import os
 import requests
@@ -60,7 +61,7 @@ class Chain(object):
             return -1
 
     def __init__(self, name, baseURL):
-        print('New chain instance created.')
+        main.logging.info(f'{name} chain initiated.')
         self.name = name
         self.baseURL = baseURL
         self._apiKey = os.getenv(f'API_{name}')
@@ -71,11 +72,6 @@ class Chain(object):
                       CREATE TABLE IF NOT EXISTS winners_{name}
                       ([ID] INTEGER PRIMARY KEY, [lottery_date] INTEGER, [winner_address] TEXT, [private_key] TEXT)
                       ''')
-        c.execute(f'INSERT INTO winners_{name} (lottery_date, winner_address, private_key) '
-                  f'VALUES ({mainWorker.timeStampToDate(time.time(), "%Y%m%d")},"asd", "asds")'
-        )
+        conn.commit()
+        conn.close()
 
-        c.execute(f'''SELECT * FROM winners_{name}''')
-        print(c.fetchall())
-
-        print(mainWorker.timeStampToDate(time.time(), '%Y%m%d'))
