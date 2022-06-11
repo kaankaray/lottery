@@ -1,13 +1,12 @@
 import main
-import time
 import os
 import requests
 import Transaction
 import sqlite3
 import mainWorker
-
-# TODO: fetchTransactions is completely broken. Need to create the address first!
-# TODO: fetchBalance is completely broken.
+from web3 import Web3, HTTPProvider
+from web3.middleware import geth_poa_middleware
+from web3.gas_strategies.rpc import rpc_gas_price_strategy
 
 
 class Chain(object):
@@ -17,48 +16,82 @@ class Chain(object):
     name: str
     baseURL: str
     _apiKey: str
+    transactions = []
+    balance = 0
 
-    def fetchTransactions(self):
-        global transactions
-        global balance
-        balance = 0
-        res = requests.get(
-            f'{self.baseURL}?module=account'
-            f'&action=txlist'
-            f'&address={"asd"}'
-            # f'&startblock=13706208'
-            f'&sort=desc'
-            f'&apikey={self._apiKey}'
-        ).json()
+    def sendTransaction(self, winnerAddress):
+        w3 = Web3(HTTPProvider(f'https://rinkeby.infura.io/v3/{os.getenv("infuraProjectID")}'))
+        w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+        w3.eth.set_gas_price_strategy(rpc_gas_price_strategy)
 
-        if int(res['status']) == 1:
-            print(res['result'][1])
-        # global transactions
-        # transactions = []
-        transactions.clear()
-        for t in res['result']:
-            if t['to'] == os.environ.get("testAddress"):
-                balance += float(t['value']) / pow(10, 18)
-                transactions.append(Transaction(t))
+        balance = w3.eth.get_balance(Web3.toChecksumAddress(mainWorker.globalEthAcc.walletVersion))
+        estimatedGasPrice = w3.eth.generate_gas_price()
 
-        for t in transactions:
-            t.chance = t.amount / balance
-            # t.printTransaction()
+        tx = w3.eth.account.sign_transaction(
+            {
+                "nonce": w3.eth.get_transaction_count(Web3.toChecksumAddress(mainWorker.globalEthAcc.walletVersion)),
+                'gasPrice': estimatedGasPrice,
+                'gas': 21000,
+                "to": Web3.toChecksumAddress(winnerAddress),
+                "value": balance - (estimatedGasPrice * 21000),
+            }, mainWorker.globalEthAcc.fetchPrivKey()
+        )
 
-    def fetchBalance(self):
-        res = requests.get(
-            f'https://api.etherscan.io/api?module=account'
-            f'&action=balance'
-            f'&address={os.environ.get("testAddress")}'
-            f'&tag=latest'
-            f'&apikey={os.environ.get("etherscanKey")}'
-        ).json()
-        print(res)
-        if int(res['status']) == 1:
-            print(float(res['result']) / pow(10, 18))
-            return float(res['result']) / pow(10, 18)
+        tx_hash = w3.eth.send_raw_transaction(tx.rawTransaction)
+        tx_receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+
+        main.logging.info(f"{self.name} chain transaction sent successfully to winner"
+                          f" {winnerAddress} hash: {tx_receipt.transactionHash.hex()}")
+
+    def pickWinner(self):
+        self.fetchTransactions(mainWorker.globalEthAcc)
+        tempBalance = self.balance * pow(10, 4)
+        if tempBalance > 100_000:
+            response = requests.get(f'https://www.random.org/integers/?num=1&min=0&max={int(tempBalance)}&col=1&base=10'
+                                    f'&format=plain&rnd=new')
+            tempBalance = int(response.text)
+            for t in self.transactions:
+                if tempBalance - (t.amount * pow(10, 4)) < 0:
+                    main.logging.info('Winner is:')
+                    t.printTransaction()
+                    self.sendTransaction(t.senderAddress)
+                    # TODO: Store the winner in DB
+
+                    self.balance = 0
+                    self.transactions = []
+                    break
+                else:
+                    tempBalance -= t.amount * pow(10, 4)
         else:
-            return -1
+            # TODO: Log no winner to DB
+            print()
+
+    def fetchTransactions(self, acc):
+        try:
+            res = requests.get(
+                f'{self.baseURL}?module=account'
+                f'&action=txlist'
+                f'&address={acc.walletVersion}'
+                f'&sort=desc'
+                f'&apikey={self._apiKey}'
+            ).json()
+            for t in res['result']:
+
+                if any(tx.hash == t['hash'] for tx in self.transactions):
+                    pass
+                else:
+                    tx = Transaction.Transaction(t)
+                    self.balance += float(t['value']) / pow(10, 18)
+                    self.transactions.append(tx)
+                    tx.printTransaction()
+                # self.balance += float(t['value']) / pow(10, 18)
+                # self.transactions.append(Transaction.Transaction(t))
+
+            for t in self.transactions:
+                t.chance = t.amount / self.balance
+                # t.printTransaction()
+        except Exception as e:
+            main.logging.error(e)
 
     def __init__(self, name, baseURL):
         main.logging.info(f'{name} chain initiated.')
