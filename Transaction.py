@@ -1,4 +1,5 @@
 import mainWorker
+import main
 
 
 class Transaction(object):
@@ -9,6 +10,7 @@ class Transaction(object):
     amount: float
     confirmations: int
     chance: int
+    hash: int
 
     def __init__(self):
         self.blockNumber = -1
@@ -18,16 +20,18 @@ class Transaction(object):
         self.confirmations = -1
 
     def __init__(self, input):
+        # print(input)
         self.blockNumber = int(input['blockNumber'])
         self.timeStamp = int(input['timeStamp'])
         self.senderAddress = input['from']
         self.amount = float(input['value']) / pow(10, 18)
         self.confirmations = int(input['confirmations'])
+        self.hash = str(input['hash'])
         self.timeStampReadable = mainWorker.timeStampToDate(self.timeStamp, '%d/%m %H:%M:%S')
 
     def printTransaction(self):
-        print(f'Transaction from {self.senderAddress}, '
-              f'at {mainWorker.timeStampToDate(self.timeStamp)}({self.timeStamp}) '
-              f'amount of {self.amount} Ether. '
-              f'Block no: #{self.blockNumber}, '
-              f'{self.confirmations} confirmations.')
+        main.logging.debug(f'Transaction({self.hash}) from {self.senderAddress}, '
+                           f'at {mainWorker.timeStampToDate(self.timeStamp)}({self.timeStamp}) '
+                           f'amount of {self.amount} Ether. '
+                           f'Block no: #{self.blockNumber}, '
+                           f'{self.confirmations} confirmations.')
