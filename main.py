@@ -1,24 +1,19 @@
 from flask import Flask, render_template, request, url_for, redirect
 from threading import Thread
+import time
 import mainWorker as w
 import logging
 
 app = Flask(__name__)
 
 logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s %(levelname)s (%(filename)s / %(funcName)s): %(message)s',
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s (%(filename)s/%(funcName)s:%(lineno)d): %(message)s',
     handlers=[
         logging.StreamHandler(),
         logging.FileHandler('output.log')
     ]
 )
-
-
-# @app.route('/', methods=['GET', 'POST'])
-# def home():
-#     return 'Hello'
-#     return redirect(url_for('hello'))
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -47,8 +42,5 @@ def hello():
 if __name__ == '__main__':
     t = Thread(target=w.execute, args=())
     t.start()
-    # pool = Pool(processes=1) # Am I gonna need multiple threads?
-    # pool.apply_async(w.execute)
-
 
     app.run()

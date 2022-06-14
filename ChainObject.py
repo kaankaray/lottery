@@ -1,6 +1,7 @@
 import main
 import os
 import requests
+import time
 import Transaction
 import sqlite3
 import mainWorker
@@ -42,6 +43,7 @@ class Chain(object):
 
         main.logging.info(f"{self.name} chain transaction sent successfully to winner"
                           f" {winnerAddress} hash: {tx_receipt.transactionHash.hex()}")
+        return tx_receipt.transactionHash.hex()
 
     def pickWinner(self):
         self.fetchTransactions(mainWorker.globalEthAcc)
@@ -54,8 +56,16 @@ class Chain(object):
                 if tempBalance - (t.amount * pow(10, 4)) < 0:
                     main.logging.info('Winner is:')
                     t.printTransaction()
-                    self.sendTransaction(t.senderAddress)
+                    txID = self.sendTransaction(t.senderAddress)
                     # TODO: Store the winner in DB
+                    conn = sqlite3.connect('test_database.sqlite3')
+                    c = conn.cursor()
+                    c.execute(f''' UPDATE winners_Rinkeby SET tx_hash=? WHERE lottery_date=?;''',
+                              ((str(txID)), mainWorker.timeStampToDate(time.time(), "%Y%m%d"))
+                              )
+                    c.execute(f''' UPDATE winners_Rinkeby SET winner_address=? WHERE lottery_date=?;''',
+                              (t.senderAddress, mainWorker.timeStampToDate(time.time(), "%Y%m%d"))
+                              )
 
                     self.balance = 0
                     self.transactions = []
@@ -63,7 +73,7 @@ class Chain(object):
                 else:
                     tempBalance -= t.amount * pow(10, 4)
         else:
-            # TODO: Log no winner to DB
+            main.logging.info('No winners.')
             print()
 
     def fetchTransactions(self, acc):
@@ -75,17 +85,11 @@ class Chain(object):
                 f'&sort=desc'
                 f'&apikey={self._apiKey}'
             ).json()
+            self.transactions = []
+            self.balance = 0
             for t in res['result']:
-
-                if any(tx.hash == t['hash'] for tx in self.transactions):
-                    pass
-                else:
-                    tx = Transaction.Transaction(t)
-                    self.balance += float(t['value']) / pow(10, 18)
-                    self.transactions.append(tx)
-                    tx.printTransaction()
-                # self.balance += float(t['value']) / pow(10, 18)
-                # self.transactions.append(Transaction.Transaction(t))
+                self.balance += float(t['value']) / pow(10, 18)
+                self.transactions.append(Transaction.Transaction(t))
 
             for t in self.transactions:
                 t.chance = t.amount / self.balance
@@ -101,10 +105,12 @@ class Chain(object):
 
         conn = sqlite3.connect('test_database.sqlite3')
         c = conn.cursor()
-        c.execute(f'''
-                      CREATE TABLE IF NOT EXISTS winners_{name}
-                      ([ID] INTEGER PRIMARY KEY, [lottery_date] INTEGER, [winner_address] TEXT, [private_key] TEXT)
+        c.execute(f'''CREATE TABLE IF NOT EXISTS winners_{name}
+                      ([ID] INTEGER PRIMARY KEY, 
+                      [lottery_date] INTEGER, 
+                      [winner_address] TEXT, 
+                      [private_key] TEXT, 
+                      [tx_hash] TEXT)
                       ''')
         conn.commit()
         conn.close()
-

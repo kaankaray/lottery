@@ -9,7 +9,6 @@ import AccountManager
 
 # TODO: remove 'test' from db name.
 
-date = 0
 globalEthAcc = AccountManager.AccountManager(randomSeed=10)
 chains = []
 
@@ -33,21 +32,22 @@ def determineWinner():
 
 def checkIfAddressExistsOrCreate():
     global globalEthAcc
-    currentDateStr = timeStampToDate(time.time(), "%Y%m%d%S")
+    currentDateStr = timeStampToDate(time.time(), "%Y%m%d")
     conn = sqlite3.connect('test_database.sqlite3')
     c = conn.cursor()
     c.execute(f'''SELECT lottery_date, private_key FROM winners_Rinkeby ORDER BY lottery_date DESC''')
     smthData = c.fetchall()
 
-    if len(smthData) == 0 or smthData[0][1] is None:
+    if len(smthData) == 0 or smthData[0][1] is None or smthData[0][0] is int(currentDateStr):
         # Create
         response = requests.get('https://www.random.org/integers/?num=1&min=-999999999&max=999999999&col=1&base=10'
                                 '&format=plain&rnd=new')
-        globalEthAcc = AccountManager.AccountManager(randomSeed=response)
+        globalEthAcc = AccountManager.AccountManager(randomSeed=int(response.text))
         logging.info(f'New day is added to the database. {globalEthAcc.walletVersion}')
-        c.execute('''INSERT INTO winners_Rinkeby (lottery_date, winner_address, private_key) 
-            VALUES (?, ?, ?)''', (currentDateStr, None, globalEthAcc.fetchPrivKey())
+        c.execute('''INSERT INTO winners_Rinkeby (lottery_date, winner_address, private_key, tx_hash) 
+            VALUES (?, ?, ?, ?)''', (currentDateStr, None, globalEthAcc.fetchPrivKey(), None)
                   )
+
     else:
         # Already exists.
         globalEthAcc = AccountManager.AccountManager(privKey=smthData[0][1])
@@ -72,11 +72,10 @@ def execute():
 
     try:
         while True:
-            logging.info(f'Loop ran at {timeStampToDate(time.time())}')
+            logging.debug(f'Loop ran at {timeStampToDate(time.time())}')
             for c in chains:
                 c.fetchTransactions(globalEthAcc)
-            test()
-            time.sleep(10)
+            time.sleep(3)
             # break
     except KeyboardInterrupt:
         logging.info(f'Keyboard interruption detected at {timeStampToDate(time.time())}')
