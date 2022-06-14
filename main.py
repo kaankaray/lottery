@@ -35,8 +35,10 @@ def hello():
                 selectedChain = w.chains[c].name
         return render_template('main.html',
                                value=w.chains[selectedChainID if selectedChainID != -1 else 0].transactions,
-                               selectedChain=selectedChain if selectedChainID != -1 else 'Mainnet')
-
+                               selectedChain=selectedChain if selectedChainID != -1 else 'Mainnet',
+                               time=w.timeStampToDate(time.time(), resultFormat='%Y-%m-%d %H:%M UTC'),
+                               address=w.globalEthAcc.walletVersion,
+                               )
 
 
 if __name__ == '__main__':
