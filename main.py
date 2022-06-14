@@ -5,7 +5,7 @@ import mainWorker as w
 import logging
 
 app = Flask(__name__)
-
+logging.getLogger('werkzeug').setLevel(logging.WARNING)  # Flask server logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s %(levelname)s (%(filename)s/%(funcName)s:%(lineno)d): %(message)s',
@@ -38,6 +38,31 @@ def hello():
                                selectedChain=selectedChain if selectedChainID != -1 else 'Mainnet',
                                time=w.timeStampToDate(time.time(), resultFormat='%Y-%m-%d %H:%M UTC'),
                                address=w.globalEthAcc.walletVersion,
+                               )
+
+
+@app.route('/winners/', methods=['GET', 'POST'])
+def winners():
+    # In case I need button handling.
+    if request.method == 'POST':
+        if request.form['submit_button'] == 'Do Something':
+            pass  # do something
+        elif request.form['submit_button'] == 'Do Something Else':
+            pass  # do something else
+        else:
+            pass  # unknown
+    elif request.method == 'GET':
+        winnersList = []
+        selectedChain = request.args.get('chain')
+        selectedChainID = -1
+        for c in range(0, len(w.chains)):
+            if w.chains[c].name.lower() == selectedChain:
+                selectedChainID = c
+                selectedChain = w.chains[c].name
+                winnersList = w.chains[c].fetchWinners()
+        return render_template('winners.html',
+                               value=winnersList,
+                               selectedChain=selectedChain if selectedChainID != -1 else 'Mainnet',
                                )
 
 
