@@ -17,10 +17,6 @@ def timeStampToDate(timestamp, resultFormat='%Y-%m-%d %H:%M:%S'):
     return datetime.utcfromtimestamp(timestamp).strftime(resultFormat)
 
 
-def test():
-    print('test')
-
-
 def determineWinner():
     for c in chains:
         c.pickWinner()
@@ -33,20 +29,21 @@ def determineWinner():
 def checkIfAddressExistsOrCreate():
     global globalEthAcc
     currentDateStr = timeStampToDate(time.time(), "%Y%m%d")
-    conn = sqlite3.connect('test_database.sqlite3')
+    conn = sqlite3.connect('database.sqlite3')
     c = conn.cursor()
-    c.execute(f'''SELECT lottery_date, private_key FROM winners_Rinkeby ORDER BY lottery_date DESC''')
+    c.execute(f'''SELECT lottery_date, private_key FROM winners_{chains[0].name} ORDER BY lottery_date DESC''')
     smthData = c.fetchall()
-
-    if len(smthData) == 0 or smthData[0][1] is None or smthData[0][0] is int(currentDateStr):
+    if len(smthData) == 0 or smthData[0][1] is None or int(smthData[0][0]) != int(currentDateStr):
         # Create
         response = requests.get('https://www.random.org/integers/?num=1&min=-999999999&max=999999999&col=1&base=10'
                                 '&format=plain&rnd=new')
         globalEthAcc = AccountManager.AccountManager(randomSeed=int(response.text))
         logging.info(f'New day is added to the database. {globalEthAcc.walletVersion}')
-        c.execute('''INSERT INTO winners_Rinkeby (lottery_date, winner_address, private_key, tx_hash) 
-            VALUES (?, ?, ?, ?)''', (currentDateStr, None, globalEthAcc.fetchPrivKey(), None)
-                  )
+        for chain in chains:
+            c.execute(f'''INSERT INTO winners_{chain.name} 
+                        (lottery_date, winner_address, private_key, wallet_version, tx_hash) VALUES (?, ?, ?, ?, ?)''',
+                      (currentDateStr, "TBD", globalEthAcc.fetchPrivKey(), globalEthAcc.walletVersion, "TBD")
+                      )
 
     else:
         # Already exists.
@@ -57,15 +54,13 @@ def checkIfAddressExistsOrCreate():
 
 
 def execute():
-    # os.remove("test_database.sqlite3")  # REMOVE ON LAUNCH
-    chains.append(ChainObject.Chain(name="Rinkeby", baseURL="https://api-rinkeby.etherscan.io/api"))
-    # chains.append(ChainObject.Chain(name="Mainnet", baseURL="https://api-rinkeby.etherscan.io/api"))
-    # chains.append(ChainObject.Chain(name="BSC", baseURL="https://api-rinkeby.etherscan.io/api"))
-    # chains.append(ChainObject.Chain(name="Polygon", baseURL="https://api-rinkeby.etherscan.io/api"))
+    chains.append(ChainObject.Chain(name="Rinkeby", baseURL="https://api-rinkeby.etherscan.io/api", rpcURL='https://rinkeby.infura.io/v3/'))
+    chains.append(ChainObject.Chain(name="Mainnet", baseURL="https://api.etherscan.io/api",         rpcURL='https://mainnet.infura.io/v3/'))
+    chains.append(ChainObject.Chain(name="BSC",     baseURL="https://api.bscscan.com/api",          rpcURL='https://rinkeby.infura.io/v3/'))
+    chains.append(ChainObject.Chain(name="Polygon", baseURL="https://api.polygonscan.com/api",      rpcURL='https://polygon-mainnet.infura.io/v3/'))
 
     scheduler = BackgroundScheduler()
     scheduler.configure(timezone="UTC")
-    # scheduler.add_job(test, 'interval', seconds=30, name='test')
     scheduler.add_job(determineWinner, 'cron', hour=23, minute=55, second=0, name='Winner winner chicken dinner.')
     checkIfAddressExistsOrCreate()
     scheduler.start()
@@ -75,7 +70,7 @@ def execute():
             logging.debug(f'Loop ran at {timeStampToDate(time.time())}')
             for c in chains:
                 c.fetchTransactions(globalEthAcc)
-            time.sleep(3)
+            # time.sleep(5)
             # break
     except KeyboardInterrupt:
         logging.info(f'Keyboard interruption detected at {timeStampToDate(time.time())}')

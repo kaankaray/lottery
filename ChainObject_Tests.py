@@ -9,7 +9,7 @@ import json
 from web3.middleware import geth_poa_middleware
 from web3.gas_strategies.rpc import rpc_gas_price_strategy
 
-exChain = Chain(name="Rinkeby", baseURL="https://api-rinkeby.etherscan.io/api")
+exChain = Chain(name="Rinkeby", baseURL="https://api-rinkeby.etherscan.io/api", rpcURL='https://rinkeby.infura.io/v3/')
 globalEthAcc = AccountManager.AccountManager(randomSeed=10)
 print(exChain)
 
@@ -29,12 +29,12 @@ class MyTestCase(unittest.TestCase):
         self.assertNotEqual(exChain.balance, 0)
 
     def test_infura_connection(self):
-        w3 = Web3(Web3.HTTPProvider(f'https://rinkeby.infura.io/v3/{os.getenv("infuraProjectID")}'))
+        w3 = Web3(Web3.HTTPProvider(f'{exChain.rpcURL}{os.getenv("infuraProjectID")}'))
         # print(w3.eth.estimate_gas())
         self.assertTrue(w3.isConnected())
 
     def test_infura_send_eth(self):
-        w3 = Web3(Web3.HTTPProvider(f'https://rinkeby.infura.io/v3/{os.getenv("infuraProjectID")}'))
+        w3 = Web3(Web3.HTTPProvider(f'{exChain.rpcURL}{os.getenv("infuraProjectID")}'))
         testAddr = '0x49351B9E33155cf5441B47D63eC6E6909422c18c'
         firstBalance = w3.eth.get_balance(testAddr)
         w3.eth.set_gas_price_strategy(rpc_gas_price_strategy)
