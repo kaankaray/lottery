@@ -41,4 +41,4 @@ class AccountManager(object):
         self._publicKey = self._privKeyToPublic(self._privateKey[2:])
         self.walletVersion = self._publicKeyToWallet(self._publicKey)
 
-        logging.info(f'Wallet created: {self.walletVersion}')
+        logging.debug(f'Wallet created: {self.walletVersion}')
